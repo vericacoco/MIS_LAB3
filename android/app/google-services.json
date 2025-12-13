@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "16094654388",
+    "project_id": "mis-meals-app-verica-2e919",
+    "storage_bucket": "mis-meals-app-verica-2e919.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:16094654388:android:4d63a2a0713ca0953b0ce1",
+        "android_client_info": {
+          "package_name": "com.example.restaurant_menu.homework_2"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAainQ0dlFGq_Zp1ntBJQLDZ6_xDGQcWfM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

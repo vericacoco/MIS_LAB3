@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
-import '../services/api_service.dart';
+
 import '../models/meal.dart';
+import '../services/api_service.dart';
+import '../services/favourites_service.dart';
 import '../widgets/meal_card.dart';
 
 class MealsPage extends StatefulWidget {
@@ -14,52 +16,85 @@ class MealsPage extends StatefulWidget {
 
 class _MealsPageState extends State<MealsPage> {
   final api = ApiService();
+  final favoritesService = FavoritesService();
+
   List<Meal> meals = [];
   List<Meal> filteredMeals = [];
+
+  // локален UI state за срцата (Firestore е извор на вистина, ова е за UX)
+  final Set<String> favoriteMealIds = {};
 
   @override
   void initState() {
     super.initState();
     loadMeals();
+    loadFavorites();
+  }
+
+  Future<void> loadFavorites() async {
+    final favs = await favoritesService.getFavorites();
+
+    setState(() {
+      favoriteMealIds.clear();
+      for (final meal in favs) {
+        favoriteMealIds.add(meal.id);
+      }
+    });
   }
 
 
-  void loadMeals() async {
-    meals = await api.loadMeals(widget.category);
-    filteredMeals = meals;
-    setState(() {});
+  Future<void> loadMeals() async {
+    final loaded = await api.loadMeals(widget.category);
+    setState(() {
+      meals = loaded;
+      filteredMeals = loaded;
+    });
   }
 
-  void searchMeals(String query) async {
-    if (query.isEmpty) {
-      filteredMeals = meals;
-    } else {
-      final results = await api.searchMeals(query);
-      filteredMeals = results;
+  Future<void> searchMeals(String query) async {
+    if (query.trim().isEmpty) {
+      setState(() => filteredMeals = meals);
+      return;
     }
-    setState(() {});
+
+    final results = await api.searchMeals(query.trim());
+    setState(() => filteredMeals = results);
+  }
+
+  Future<void> toggleFavorite(Meal meal) async {
+    final wasFav = favoriteMealIds.contains(meal.id);
+
+    // 1) UI toggle веднаш (побрз UX)
+    setState(() {
+      if (wasFav) {
+        favoriteMealIds.remove(meal.id);
+      } else {
+        favoriteMealIds.add(meal.id);
+      }
+    });
+
+    // 2) Firestore sync
+    if (wasFav) {
+      await favoritesService.removeFavorite(meal.id);
+    } else {
+      await favoritesService.addFavorite(meal);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.category),
-      ),
-
+      appBar: AppBar(title: Text(widget.category)),
       body: Column(
         children: [
-
-
+          // SEARCH + SHUFFLE
           Padding(
             padding: const EdgeInsets.all(12.0),
             child: Row(
               children: [
-
-
                 Expanded(
                   child: TextField(
-                    onChanged: searchMeals,
+                    onChanged: (v) => searchMeals(v),
                     decoration: InputDecoration(
                       hintText: "Search meals...",
                       border: OutlineInputBorder(
@@ -68,18 +103,16 @@ class _MealsPageState extends State<MealsPage> {
                     ),
                   ),
                 ),
-
                 const SizedBox(width: 10),
-
-
                 IconButton(
                   icon: const Icon(Icons.shuffle, size: 30),
                   onPressed: () async {
-                    final randomMeal = await api.randomMeal();
+                    final randomMealDetail = await api.randomMeal();
+                    if (!mounted) return;
                     Navigator.pushNamed(
                       context,
                       "/detail",
-                      arguments: randomMeal,
+                      arguments: randomMealDetail,
                     );
                   },
                 ),
@@ -87,7 +120,7 @@ class _MealsPageState extends State<MealsPage> {
             ),
           ),
 
-
+          // GRID
           Expanded(
             child: GridView.builder(
               padding: const EdgeInsets.all(10),
@@ -99,7 +132,13 @@ class _MealsPageState extends State<MealsPage> {
               ),
               itemCount: filteredMeals.length,
               itemBuilder: (_, index) {
-                return MealCard(meal: filteredMeals[index]);
+                final meal = filteredMeals[index];
+
+                return MealCard(
+                  meal: meal,
+                  isFavorite: favoriteMealIds.contains(meal.id),
+                  onToggleFavorite: () => toggleFavorite(meal),
+                );
               },
             ),
           ),

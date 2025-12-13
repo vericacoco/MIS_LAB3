@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
-import '../models/category.dart';
+import '../services/notification_service.dart';
 import '../services/api_service.dart';
+import '../models/category.dart';
 import '../widgets/category_card.dart';
+import 'favorites_page.dart';
 
 class CategoriesPage extends StatefulWidget {
   const CategoriesPage({super.key});
@@ -12,26 +14,40 @@ class CategoriesPage extends StatefulWidget {
 
 class _CategoriesPageState extends State<CategoriesPage> {
   final api = ApiService();
+
   List<Category> categories = [];
-  List<Category> filtered = [];
+  List<Category> filteredCategories = [];
 
   @override
   void initState() {
     super.initState();
     loadCategories();
+    _initNotifications();
   }
 
-  void loadCategories() async {
-    categories = await api.loadCategories();
-    filtered = categories;
-    setState(() {});
+  Future<void> _initNotifications() async {
+    await NotificationService.init();
+    await NotificationService.showTestNotification();
   }
 
-  void search(String text) {
+  Future<void> loadCategories() async {
+    final data = await api.loadCategories();
     setState(() {
-      filtered = categories
-          .where((c) => c.name.toLowerCase().contains(text.toLowerCase()))
-          .toList();
+      categories = data;
+      filteredCategories = data;
+    });
+  }
+
+  void searchCategories(String query) {
+    setState(() {
+      if (query.trim().isEmpty) {
+        filteredCategories = categories;
+      } else {
+        filteredCategories = categories
+            .where((c) =>
+            c.name.toLowerCase().contains(query.toLowerCase()))
+            .toList();
+      }
     });
   }
 
@@ -39,35 +55,54 @@ class _CategoriesPageState extends State<CategoriesPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Meal Categories"),
+        title: const Text("Categories"),
         actions: [
           IconButton(
-            icon: const Icon(Icons.shuffle),
-            onPressed: () async {
-              final meal = await api.randomMeal();
-              Navigator.pushNamed(context, "/detail", arguments: meal);
+            icon: const Icon(Icons.favorite),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const FavoritesPage(),
+                ),
+              );
             },
-          )
+          ),
         ],
       ),
       body: Column(
         children: [
+          // SEARCH
           Padding(
             padding: const EdgeInsets.all(12),
             child: TextField(
-              onChanged: search,
-              decoration: const InputDecoration(
+              onChanged: searchCategories,
+              decoration: InputDecoration(
                 hintText: "Search categories...",
-                prefixIcon: Icon(Icons.search),
-                border: OutlineInputBorder(),
+                prefixIcon: const Icon(Icons.search),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
             ),
           ),
+
+          // CATEGORY LIST
           Expanded(
-            child: ListView.builder(
-              itemCount: filtered.length,
-              itemBuilder: (context, index) =>
-                  CategoryCard(category: filtered[index]),
+            child: filteredCategories.isEmpty
+                ? const Center(
+              child: Text(
+                "No categories found",
+                style: TextStyle(fontSize: 16),
+              ),
+            )
+                : ListView.builder(
+              itemCount: filteredCategories.length,
+              itemBuilder: (_, index) {
+                return CategoryCard(
+                  category: filteredCategories[index],
+                );
+              },
             ),
           ),
         ],
